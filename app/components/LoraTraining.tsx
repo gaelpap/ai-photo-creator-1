@@ -253,15 +253,14 @@ function LoraTraining() {
           {auth.currentUser ? (
             <>
               <span className="mr-4 text-lg font-bold text-black">Credits: {loraCredits}</span>
-              {loraCredits <= 0 && (
-                <button
-                  onClick={() => router.push('/purchase-credits')}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  Purchase Credits
-                </button>
-              )}
-              <Button onClick={handleLogout} className="bg-red-500 text-white ml-2">
+              {/* Always show the Purchase Credits button */}
+              <button
+                onClick={() => router.push('/purchase-credits')}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mr-2"
+              >
+                Purchase Credits
+              </button>
+              <Button onClick={handleLogout} className="bg-red-500 text-white">
                 Logout
               </Button>
             </>
