@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // Make sure to import db
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore'; // Import Firestore functions
 import { useRouter } from 'next/navigation';
 
 export default function Login() {
@@ -20,7 +21,18 @@ export default function Login() {
         await signInWithEmailAndPassword(auth, email, password);
         setMessage('Logged in successfully!');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        // Register new user
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Create a corresponding document in Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+          email: user.email,
+          createdAt: new Date(),
+          loraCredits: 0,
+          imageCredits: 0
+        });
+        
         setMessage('Registered successfully!');
       }
       router.push('/');
