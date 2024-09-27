@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { auth } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin'; // Make sure to import Firestore
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2022-11-15',
@@ -26,7 +27,35 @@ export async function POST(req: Request) {
 
     const userId = decodedToken.uid;
 
+    // Fetch user data from Firestore
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData) {
+      return NextResponse.json({ error: 'User data not found' }, { status: 404 });
+    }
+
+    // Create or retrieve a Stripe customer
+    let customer;
+    if (userData.stripeCustomerId) {
+      customer = await stripe.customers.retrieve(userData.stripeCustomerId);
+    } else {
+      customer = await stripe.customers.create({
+        email: userData.email,
+        metadata: {
+          firebaseUID: userId,
+          rewardful: referral || ''
+        }
+      });
+
+      // Update user document with Stripe customer ID
+      await db.collection('users').doc(userId).update({
+        stripeCustomerId: customer.id
+      });
+    }
+
     const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
       payment_method_types: ['card'],
       line_items: [
         {
