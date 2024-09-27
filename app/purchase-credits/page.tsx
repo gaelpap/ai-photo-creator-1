@@ -1,14 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { Button } from "@/components/ui/button";
 import { loadStripe } from '@stripe/stripe-js';
 
+declare global {
+  interface Window {
+    rewardful: (action: string, callback: () => void) => void;
+    Rewardful: { referral: string | null };
+  }
+}
+
 export default function PurchaseCredits() {
   const [isLoading, setIsLoading] = useState(false);
+  const [referral, setReferral] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    window.rewardful('ready', function() {
+      setReferral(window.Rewardful.referral);
+    });
+  }, []);
 
   const handlePurchase = async () => {
     setIsLoading(true);
@@ -27,6 +41,7 @@ export default function PurchaseCredits() {
           'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ referral }) // Include the referral ID in the request body
       });
       if (!response.ok) {
         const errorData = await response.json();

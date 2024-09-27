@@ -10,6 +10,7 @@ const LORA_CREDITS_PRICE_ID = 'price_1Q2cMtEI2MwEjNuQOwcPYUCk';
 
 export async function POST(req: Request) {
   try {
+    const { referral } = await req.json();
     const idToken = req.headers.get('Authorization')?.split('Bearer ')[1];
     if (!idToken) {
       return NextResponse.json({ error: 'No token provided' }, { status: 401 });
@@ -37,6 +38,9 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/lora-training`,
       client_reference_id: userId,
+      metadata: {
+        rewardful: referral || ''
+      }
     });
 
     return NextResponse.json({ sessionId: session.id });
