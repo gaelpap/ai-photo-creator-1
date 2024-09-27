@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         email: userData.email,
         metadata: {
           firebaseUID: userId,
-          rewardful: referral || ''
+          referral: referral || '' // Changed from 'rewardful' to 'referral'
         }
       });
 
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/lora-training`,
       client_reference_id: userId,
       metadata: {
-        rewardful: referral || ''
+        referral: referral || '' // Changed from 'rewardful' to 'referral'
       }
     });
 
