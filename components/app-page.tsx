@@ -20,6 +20,15 @@ interface LoRA {
   scale: number;
 }
 
+declare global {
+  interface Window {
+    rewardful: (action: string, callback: () => void) => void;
+    Rewardful: {
+      referral: string | null;
+    };
+  }
+}
+
 export function Page() {
   const [prompt, setPrompt] = useState('')
   const [loras, setLoras] = useState<LoRA[]>([])
@@ -30,6 +39,7 @@ export function Page() {
   const [credits, setCredits] = useState(0);
   const [language, setLanguage] = useState('en')
   const [translatedPrompt, setTranslatedPrompt] = useState('')
+  const [referral, setReferral] = useState<string | null>(null)
   const searchParams = useSearchParams();
 
   const router = useRouter()
@@ -52,6 +62,13 @@ export function Page() {
         setCredits(0);
       }
     });
+
+    // Rewardful integration
+    if (typeof window !== 'undefined' && window.rewardful) {
+      window.rewardful('ready', function() {
+        setReferral(window.Rewardful.referral);
+      });
+    }
 
     return () => unsubscribe();
   }, []);
@@ -178,6 +195,7 @@ export function Page() {
           'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ referral }), // Include referral ID in the request
       });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
