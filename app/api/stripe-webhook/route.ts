@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.client_reference_id;
-    const referralId = session.metadata?.referral;
+    const rewardfulId = session.metadata?.rewardful;
 
     if (userId) {
       try {
@@ -38,10 +38,10 @@ export async function POST(req: Request) {
         });
 
         // Process the referral if present
-        if (referralId) {
+        if (rewardfulId) {
           const referrerQuery = query(
             collection(db, 'users'),
-            where('referralCode', '==', referralId),
+            where('referralCode', '==', rewardfulId),
             limit(1)
           );
           const referrerSnapshot = await getDocs(referrerQuery);

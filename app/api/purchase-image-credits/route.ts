@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
       client_reference_id: userId,
       metadata: {
-        referral: referral || '', // Include referral in metadata
+        rewardful: referral || '', // Use 'rewardful' as the key for Rewardful integration
       },
     });
 
