@@ -40,11 +40,35 @@ export function Page() {
   const [language, setLanguage] = useState('en')
   const [translatedPrompt, setTranslatedPrompt] = useState('')
   const [referral, setReferral] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false)
   const searchParams = useSearchParams();
 
   const router = useRouter()
 
   useEffect(() => {
+    const checkUserData = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        setUser(user);
+        if (user.email) {
+          setEmail(user.email);
+        } else {
+          // Check Firestore for email
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const userData = userDoc.data();
+          if (userData?.email) {
+            setEmail(userData.email);
+          } else {
+            setShowEmailPrompt(true);
+          }
+        }
+        checkCredits();
+      } else {
+        setCredits(0);
+      }
+    };
+
     const checkCredits = async () => {
       const user = auth.currentUser;
       if (user) {
@@ -54,14 +78,7 @@ export function Page() {
       }
     };
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      setUser(user);
-      if (user) {
-        checkCredits();
-      } else {
-        setCredits(0);
-      }
-    });
+    const unsubscribe = auth.onAuthStateChanged(checkUserData);
 
     // Rewardful integration
     if (typeof window !== 'undefined' && window.rewardful) {
@@ -182,9 +199,21 @@ export function Page() {
     }
   };
 
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (user) {
+      await setDoc(doc(db, 'users', user.uid), { email }, { merge: true });
+      setShowEmailPrompt(false);
+    }
+  };
+
   const handlePurchaseCredits = async () => {
     if (!user) {
       alert('Please log in to purchase credits.');
+      return;
+    }
+    if (!email) {
+      setShowEmailPrompt(true);
       return;
     }
     try {
@@ -195,7 +224,7 @@ export function Page() {
           'Authorization': `Bearer ${idToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ referral }), // Include referral ID in the request
+        body: JSON.stringify({ referral, email }),
       });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -350,6 +379,22 @@ export function Page() {
         <p className="mt-2 text-sm text-gray-600">
           Translated prompt: {translatedPrompt}
         </p>
+      )}
+      {showEmailPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <form onSubmit={handleEmailSubmit} className="bg-white p-6 rounded-lg">
+            <h2 className="text-xl font-bold mb-4">Please provide your email</h2>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              className="mb-4"
+              required
+            />
+            <Button type="submit">Submit</Button>
+          </form>
+        </div>
       )}
     </div>
   )
