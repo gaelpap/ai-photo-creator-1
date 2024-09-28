@@ -1,52 +1,80 @@
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { auth } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
-import { ImageGenerator } from './ImageGenerator';
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { auth } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin'; // Make sure to import Firestore
 
-export function Page() {
-  const [showImageGenerator, setShowImageGenerator] = useState(false);
-  const router = useRouter();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2022-11-15',
+});
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push('/login');
-    } catch (error) {
-      console.error('Failed to log out', error);
+const LORA_CREDITS_PRICE_ID = 'price_1Q2cMtEI2MwEjNuQOwcPYUCk';
+
+export async function POST(req: Request) {
+  try {
+    const { referral } = await req.json();
+    const idToken = req.headers.get('Authorization')?.split('Bearer ')[1];
+    if (!idToken) {
+      return NextResponse.json({ error: 'No token provided' }, { status: 401 });
     }
-  };
 
-  return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-8 bg-white shadow-md rounded px-6 py-4">
-          <h1 className="text-3xl font-bold text-black">Image Generator App</h1>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Logout
-          </button>
-        </header>
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(idToken);
+    } catch (error) {
+      console.error('Error verifying token:', error);
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
 
-        {!showImageGenerator ? (
-          <div className="text-center bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-            <p className="text-xl text-black font-semibold mb-4">Welcome to the Image Generator!</p>
-            <button
-              onClick={() => setShowImageGenerator(true)}
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Start Generating Images
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-            <h2 className="text-2xl font-bold text-black mb-4">Image Generator</h2>
-            <ImageGenerator />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    const userId = decodedToken.uid;
+
+    // Fetch user data from Firestore
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData) {
+      return NextResponse.json({ error: 'User data not found' }, { status: 404 });
+    }
+
+    // Create or retrieve a Stripe customer
+    let customer;
+    if (userData.stripeCustomerId) {
+      customer = await stripe.customers.retrieve(userData.stripeCustomerId);
+    } else {
+      customer = await stripe.customers.create({
+        email: userData.email,
+        metadata: {
+          firebaseUID: userId,
+          referral: referral || '' // Changed from 'rewardful' to 'referral'
+        }
+      });
+
+      // Update user document with Stripe customer ID
+      await db.collection('users').doc(userId).update({
+        stripeCustomerId: customer.id
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: LORA_CREDITS_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/purchase-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/lora-training`,
+      client_reference_id: userId,
+      metadata: {
+        referral: referral || '' // Changed from 'rewardful' to 'referral'
+      }
+    });
+
+    return NextResponse.json({ sessionId: session.id });
+  } catch (err) {
+    console.error('Error creating checkout session:', err);
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+  }
 }
