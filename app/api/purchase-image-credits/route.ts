@@ -11,7 +11,7 @@ const IMAGE_CREDITS_PRICE_ID = 'your_price_id_here';
 
 export async function POST(req: Request) {
   try {
-    const { referral } = await req.json();
+    const { referral } = await req.json(); // Extract referral from request body
     const idToken = req.headers.get('Authorization')?.split('Bearer ')[1];
     if (!idToken) {
       return NextResponse.json({ error: 'No token provided' }, { status: 401 });
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         email: userData.email,
         metadata: {
           firebaseUID: userId,
-          referral: referral || ''
+          referral: referral || '' // Include referral in customer metadata
         }
       });
 
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
       client_reference_id: userId,
       metadata: {
-        referral: referral || ''
+        referral: referral || '' // Include referral in session metadata
       }
     });
 
