@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2022-11-15',
 });
+
+const IMAGE_CREDITS_PRICE_ID = 'price_1Q2f46EI2MwEjNuQqxAJwo79'; // Replace with your actual price ID for image credits
+const LORA_CREDITS_PRICE_ID = 'price_xxxxxxxxxxxxxxxx'; // Replace with your actual price ID for LoRA credits
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -20,56 +23,52 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  console.log('Received event type:', event.type);
-
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    console.log('Session data:', JSON.stringify(session, null, 2));
-
-    const userId = session.metadata?.userId;
-    console.log('UserId from metadata:', userId);
+    const userId = session.client_reference_id;
 
     if (userId) {
       try {
         const userRef = doc(db, 'users', userId);
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
         
-        // Get current credits
-        const userDoc = await getDoc(userRef);
-        const currentImageCredits = userDoc.data()?.imageCredits || 0;
-        const currentLoraCredits = userDoc.data()?.loraCredits || 0;
-        console.log('Current image credits:', currentImageCredits);
-        console.log('Current LoRA credits:', currentLoraCredits);
+        for (const item of lineItems.data) {
+          if (item.price?.id === IMAGE_CREDITS_PRICE_ID) {
+            await updateDoc(userRef, {
+              imageCredits: increment(100 * (item.quantity || 1))
+            });
+            console.log(`${100 * (item.quantity || 1)} image credits added for user ${userId}`);
+          } else if (item.price?.id === LORA_CREDITS_PRICE_ID) {
+            await updateDoc(userRef, {
+              loraCredits: increment(3 * (item.quantity || 1))
+            });
+            console.log(`${3 * (item.quantity || 1)} LoRA credits added for user ${userId}`);
+          }
+        }
 
-        // Update the user's image and LoRA credits
-        await updateDoc(userRef, {
-          imageCredits: increment(100), // Add 100 image credits
-          loraCredits: increment(3)     // Add 3 LoRA credits
-        });
+        // Handle affiliate commission (you'll need to implement this based on your specific requirements)
+        // For example:
+        // await handleAffiliateCommission(session);
 
-        // Get updated credits
-        const updatedUserDoc = await getDoc(userRef);
-        const updatedImageCredits = updatedUserDoc.data()?.imageCredits || 0;
-        const updatedLoraCredits = updatedUserDoc.data()?.loraCredits || 0;
-        console.log('Updated image credits:', updatedImageCredits);
-        console.log('Updated LoRA credits:', updatedLoraCredits);
-
-        console.log(`Credits added for user ${userId}. New totals: Image Credits: ${updatedImageCredits}, LoRA Credits: ${updatedLoraCredits}`);
-        return NextResponse.json({ 
-          received: true, 
-          imageCreditsAdded: 100, 
-          loraCreditsAdded: 3, 
-          newImageTotal: updatedImageCredits,
-          newLoraTotal: updatedLoraCredits
-        });
+        return NextResponse.json({ received: true, creditsAdded: true });
       } catch (error) {
         console.error('Error updating user data:', error);
-        return NextResponse.json({ error: 'Error updating user data', details: error }, { status: 500 });
+        return NextResponse.json({ error: 'Error updating user data' }, { status: 500 });
       }
     } else {
-      console.error('No userId found in session metadata');
-      return NextResponse.json({ error: 'No userId found in session metadata' }, { status: 400 });
+      console.error('No userId found in client_reference_id');
+      return NextResponse.json({ error: 'No userId found in client_reference_id' }, { status: 400 });
     }
   }
 
   return NextResponse.json({ received: true });
 }
+
+// You'll need to implement this function based on your affiliate system
+// async function handleAffiliateCommission(session: Stripe.Checkout.Session) {
+//   const referralId = session.metadata?.referral;
+//   if (referralId) {
+//     // Implement your affiliate commission logic here
+//     console.log(`Processing affiliate commission for referral ID: ${referralId}`);
+//   }
+// }
