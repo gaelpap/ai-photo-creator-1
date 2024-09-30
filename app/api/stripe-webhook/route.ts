@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, increment, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2022-11-15',
@@ -22,39 +22,16 @@ export async function POST(req: Request) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.metadata?.userId;
-    const referralId = session.client_reference_id;
 
     if (userId) {
       try {
-        // Update the user's LoRA credits
+        // Update the user's image credits
         const userRef = doc(db, 'users', userId);
         await updateDoc(userRef, {
-          loraCredits: increment(3) // Add 3 LoRA credits
+          imageCredits: increment(100) // Add 100 image credits
         });
 
-        // Update the user's image credits
-        await updateDoc(userRef, {
-          imageCredits: increment(10) // Add 10 image credits, adjust as needed
-        });
-
-        // Process the referral if present
-        if (referralId) {
-          const referrerQuery = query(
-            collection(db, 'users'),
-            where('referralCode', '==', referralId),
-            limit(1)
-          );
-          const referrerSnapshot = await getDocs(referrerQuery);
-          
-          if (!referrerSnapshot.empty) {
-            const referrerDoc = referrerSnapshot.docs[0];
-            await updateDoc(referrerDoc.ref, {
-              referralRewards: increment(1) // Or whatever reward you want to give
-            });
-          }
-        }
-
-        console.log(`Credits added for user ${userId}`);
+        console.log(`100 credits added for user ${userId}`);
         return NextResponse.json({ received: true });
       } catch (error) {
         console.error('Error updating user data:', error);
