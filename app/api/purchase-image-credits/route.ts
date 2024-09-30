@@ -70,9 +70,9 @@ export async function POST(req: Request) {
       mode: 'payment',
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
-      client_reference_id: userId,
+      client_reference_id: referral || '', // Use referral ID as client_reference_id
       metadata: {
-        rewardful: referral || '', // Use 'rewardful' as the key for Rewardful integration
+        userId: userId, // Include userId in metadata
       },
     });
 

@@ -21,8 +21,8 @@ export async function POST(req: Request) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.client_reference_id;
-    const rewardfulId = session.metadata?.rewardful;
+    const userId = session.metadata?.userId;
+    const referralId = session.client_reference_id;
 
     if (userId) {
       try {
@@ -38,10 +38,10 @@ export async function POST(req: Request) {
         });
 
         // Process the referral if present
-        if (rewardfulId) {
+        if (referralId) {
           const referrerQuery = query(
             collection(db, 'users'),
-            where('referralCode', '==', rewardfulId),
+            where('referralCode', '==', referralId),
             limit(1)
           );
           const referrerSnapshot = await getDocs(referrerQuery);
@@ -61,8 +61,8 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Error updating user data' }, { status: 500 });
       }
     } else {
-      console.error('No userId found in session client_reference_id');
-      return NextResponse.json({ error: 'No userId found in session client_reference_id' }, { status: 400 });
+      console.error('No userId found in session metadata');
+      return NextResponse.json({ error: 'No userId found in session metadata' }, { status: 400 });
     }
   }
 
